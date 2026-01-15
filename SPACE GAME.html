@@ -1,0 +1,2989 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>星際探險者：地球歸途</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            user-select: none;
+        }
+        
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            touch-action: none;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, #0a0a2a 0%, #000033 100%);
+            overflow: hidden;
+        }
+        
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+        
+        /* 移動控制 - 完全重構 */
+        .touch-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 35vh;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .control-row {
+            display: flex;
+            flex: 1;
+            margin-bottom: 10px;
+        }
+        
+        .control-section {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        
+        .joystick-area {
+            position: relative;
+            width: 150px;
+            height: 150px;
+        }
+        
+        .joystick-base {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            background: rgba(30, 40, 90, 0.3);
+            border: 2px solid rgba(74, 91, 199, 0.5);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        
+        .joystick-handle {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: rgba(74, 91, 199, 0.9);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            transition: transform 0.1s;
+        }
+        
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            padding: 20px;
+        }
+        
+        .action-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(30, 40, 90, 0.8);
+            border: 3px solid #4a5bc7;
+            color: #c2e0ff;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.1s;
+            pointer-events: auto;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            touch-action: manipulation;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .action-btn:active {
+            background: rgba(40, 60, 140, 0.9);
+            transform: scale(0.9);
+            border-color: #5a6bd7;
+        }
+        
+        .action-btn.pressed {
+            background: rgba(40, 60, 140, 0.9);
+            transform: scale(0.9);
+            border-color: #5a6bd7;
+        }
+        
+        .action-btn.double {
+            grid-column: span 2;
+            width: 180px;
+            height: 80px;
+            border-radius: 40px;
+        }
+        
+        .btn-label {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: #a0b0ff;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        
+        .btn-touch-feedback {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0;
+            animation: touchRipple 0.3s ease-out;
+        }
+        
+        @keyframes touchRipple {
+            0% {
+                transform: translate(-50%, -50%) scale(0.3);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0;
+            }
+        }
+        
+        /* 狀態顯示 */
+        .status-bar {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            background: rgba(15, 20, 50, 0.8);
+            border-radius: 10px;
+            padding: 10px;
+            border: 1px solid #3a4b8a;
+            pointer-events: auto;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .stat-icon {
+            font-size: 16px;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            color: #4fc3f7;
+        }
+        
+        .resource-bar {
+            height: 10px;
+            background: rgba(20, 30, 70, 0.8);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 2px;
+            position: relative;
+        }
+        
+        .resource-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+        
+        .health-fill {
+            background: linear-gradient(to right, #4caf50, #8bc34a);
+        }
+        
+        .fuel-fill {
+            background: linear-gradient(to right, #ff9800, #ff5722);
+        }
+        
+        .energy-fill {
+            background: linear-gradient(to right, #2196f3, #03a9f4);
+        }
+        
+        /* 對話框 */
+        .dialog-box {
+            position: absolute;
+            bottom: 35vh;
+            left: 10px;
+            right: 10px;
+            background: rgba(15, 20, 50, 0.95);
+            border-radius: 10px;
+            padding: 15px;
+            border: 2px solid #4a5bc7;
+            display: none;
+            pointer-events: auto;
+            box-shadow: 0 0 20px rgba(0, 100, 255, 0.5);
+        }
+        
+        .dialog-title {
+            color: #4fc3f7;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .dialog-text {
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+        
+        .dialog-choices {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .dialog-choice {
+            background: rgba(30, 40, 90, 0.8);
+            border: 1px solid #4a5bc7;
+            color: #c2e0ff;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        
+        .dialog-choice:active {
+            background: rgba(40, 60, 140, 0.9);
+            transform: scale(0.98);
+        }
+        
+        /* 戰鬥界面 */
+        .battle-ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 3;
+            pointer-events: auto;
+        }
+        
+        .enemy-info {
+            background: rgba(30, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 2px solid #ff5252;
+            width: 80%;
+            max-width: 300px;
+        }
+        
+        .battle-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            width: 90%;
+            max-width: 350px;
+        }
+        
+        .battle-action {
+            background: rgba(30, 40, 90, 0.9);
+            border: 2px solid #4a5bc7;
+            color: #c2e0ff;
+            padding: 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 1.1rem;
+            transition: all 0.1s;
+        }
+        
+        .battle-action:active {
+            background: rgba(40, 60, 140, 0.9);
+            transform: scale(0.95);
+        }
+        
+        .battle-log {
+            position: absolute;
+            bottom: 20px;
+            left: 10px;
+            right: 10px;
+            height: 120px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 8px;
+            padding: 10px;
+            overflow-y: auto;
+            font-size: 0.9rem;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding-bottom: 5px;
+            border-bottom: 1px dotted #333;
+        }
+        
+        /* 物品欄 */
+        .inventory {
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            width: 200px;
+            background: rgba(15, 20, 50, 0.95);
+            border-radius: 10px;
+            padding: 10px;
+            border: 1px solid #3a4b8a;
+            display: none;
+            pointer-events: auto;
+            box-shadow: 0 0 15px rgba(0, 100, 255, 0.3);
+        }
+        
+        .inventory-title {
+            color: #4fc3f7;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .inventory-items {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        
+        .inventory-item {
+            background: rgba(30, 40, 90, 0.8);
+            border: 1px solid #3a4b8a;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .inventory-item:active {
+            background: rgba(40, 60, 140, 0.9);
+            transform: scale(0.95);
+        }
+        
+        /* 小地圖 */
+        .minimap {
+            position: absolute;
+            top: 60px;
+            left: 10px;
+            width: 120px;
+            height: 120px;
+            background: rgba(15, 20, 50, 0.8);
+            border-radius: 10px;
+            border: 1px solid #3a4b8a;
+            overflow: hidden;
+        }
+        
+        .minimap-player {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #4fc3f7;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+        }
+        
+        /* 通知 */
+        .notification {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(15, 20, 50, 0.95);
+            padding: 20px 30px;
+            border-radius: 12px;
+            border: 2px solid #4fc3f7;
+            z-index: 10;
+            display: none;
+            pointer-events: none;
+            animation: fadeInOut 2s ease;
+            text-align: center;
+            min-width: 200px;
+            max-width: 300px;
+        }
+        
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -40%); }
+            20% { opacity: 1; transform: translate(-50%, -50%); }
+            80% { opacity: 1; transform: translate(-50%, -50%); }
+            100% { opacity: 0; transform: translate(-50%, -60%); }
+        }
+        
+        /* 能力按鈕 */
+        .ability-btn {
+            position: absolute;
+            bottom: 40%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(100, 0, 200, 0.8);
+            border: 3px solid #c5a3ff;
+            color: #fff;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            pointer-events: auto;
+            z-index: 2;
+            transition: all 0.1s;
+        }
+        
+        .ability-btn:active {
+            transform: translateX(-50%) scale(0.9);
+            background: rgba(120, 20, 220, 0.9);
+        }
+        
+        .ability-btn.cooldown {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* 音樂控制 */
+        .music-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 10px;
+            pointer-events: auto;
+            z-index: 4;
+        }
+        
+        .music-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(15, 20, 50, 0.8);
+            border: 2px solid #4a5bc7;
+            color: #c2e0ff;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .music-btn:active {
+            background: rgba(40, 60, 140, 0.9);
+            transform: scale(0.95);
+        }
+        
+        .music-btn.muted {
+            opacity: 0.5;
+        }
+        
+        /* 觸控引導 */
+        .touch-guide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            pointer-events: auto;
+        }
+        
+        .guide-content {
+            background: rgba(15, 20, 50, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px solid #4a5bc7;
+            max-width: 350px;
+            text-align: center;
+        }
+        
+        .guide-gesture {
+            font-size: 48px;
+            margin: 20px 0;
+            animation: bounce 1s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        /* 控制提示 */
+        .control-hint {
+            position: absolute;
+            bottom: 5px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 2;
+        }
+        
+        /* 響應式調整 */
+        @media (max-width: 768px) {
+            .joystick-area {
+                width: 130px;
+                height: 130px;
+            }
+            
+            .joystick-base {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .joystick-handle {
+                width: 50px;
+                height: 50px;
+            }
+            
+            .action-btn {
+                width: 70px;
+                height: 70px;
+                font-size: 22px;
+            }
+            
+            .action-btn.double {
+                width: 160px;
+                height: 70px;
+            }
+            
+            .ability-btn {
+                width: 70px;
+                height: 70px;
+                font-size: 12px;
+            }
+            
+            .music-btn {
+                width: 45px;
+                height: 45px;
+                font-size: 18px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .joystick-area {
+                width: 110px;
+                height: 110px;
+            }
+            
+            .joystick-base {
+                width: 90px;
+                height: 90px;
+            }
+            
+            .joystick-handle {
+                width: 45px;
+                height: 45px;
+            }
+            
+            .action-btn {
+                width: 65px;
+                height: 65px;
+                font-size: 20px;
+            }
+            
+            .action-btn.double {
+                width: 140px;
+                height: 65px;
+            }
+            
+            .battle-actions {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .battle-action {
+                padding: 18px;
+            }
+            
+            .minimap {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .inventory {
+                width: 180px;
+            }
+            
+            .music-controls {
+                top: 5px;
+                right: 5px;
+            }
+            
+            .music-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+            }
+        }
+        
+        @media (max-height: 700px) {
+            .touch-controls {
+                height: 40vh;
+            }
+            
+            .dialog-box {
+                bottom: 40vh;
+            }
+        }
+        
+        /* 按鈕狀態指示器 */
+        .btn-state {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+            display: none;
+        }
+        
+        .btn-state.active {
+            display: block;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        /* 音量控制 */
+        .volume-slider {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            width: 30px;
+            height: 120px;
+            background: rgba(15, 20, 50, 0.9);
+            border-radius: 15px;
+            border: 1px solid #3a4b8a;
+            padding: 10px 0;
+            display: none;
+            pointer-events: auto;
+        }
+        
+        .volume-track {
+            position: relative;
+            width: 8px;
+            height: 100px;
+            background: rgba(20, 30, 70, 0.8);
+            border-radius: 4px;
+            margin: 0 auto;
+        }
+        
+        .volume-thumb {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #4fc3f7;
+            border-radius: 50%;
+            left: 50%;
+            transform: translateX(-50%);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div class="ui-overlay">
+            <!-- 狀態欄 -->
+            <div class="status-bar">
+                <div class="stats">
+                    <div class="stat">
+                        <span class="stat-icon">❤️</span>
+                        <span class="stat-value" id="healthValue">100</span>
+                        <div class="btn-state" id="healthState"></div>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-icon">⛽</span>
+                        <span class="stat-value" id="fuelValue">60</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-icon">⚡</span>
+                        <span class="stat-value" id="energyValue">80</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-icon">💰</span>
+                        <span class="stat-value" id="creditsValue">50</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-icon">⭐</span>
+                        <span class="stat-value" id="levelValue">1</span>
+                    </div>
+                </div>
+                <div class="resource-bar" id="healthBarContainer">
+                    <div class="resource-fill health-fill" id="healthBar" style="width: 100%"></div>
+                </div>
+                <div class="resource-bar" id="fuelBarContainer">
+                    <div class="resource-fill fuel-fill" id="fuelBar" style="width: 60%"></div>
+                </div>
+                <div class="resource-bar" id="energyBarContainer">
+                    <div class="resource-fill energy-fill" id="energyBar" style="width: 80%"></div>
+                </div>
+            </div>
+            
+            <!-- 小地圖 -->
+            <div class="minimap">
+                <div class="minimap-player" id="minimapPlayer"></div>
+            </div>
+            
+            <!-- 物品欄 -->
+            <div class="inventory" id="inventoryPanel">
+                <div class="inventory-title">物品欄</div>
+                <div class="inventory-items" id="inventoryItems">
+                    <!-- 物品將由JS動態生成 -->
+                </div>
+            </div>
+            
+            <!-- 對話框 -->
+            <div class="dialog-box" id="dialogBox">
+                <div class="dialog-title" id="dialogTitle">對話</div>
+                <div class="dialog-text" id="dialogText"></div>
+                <div class="dialog-choices" id="dialogChoices"></div>
+            </div>
+            
+            <!-- 戰鬥界面 -->
+            <div class="battle-ui" id="battleUI">
+                <div class="enemy-info" id="enemyInfo">
+                    <h3 id="enemyName">太空海盜</h3>
+                    <div class="resource-bar">
+                        <div class="resource-fill health-fill" id="enemyHealthBar" style="width: 100%"></div>
+                    </div>
+                </div>
+                
+                <div class="battle-actions" id="battleActions">
+                    <!-- 戰鬥行動將由JS動態生成 -->
+                </div>
+                
+                <div class="battle-log" id="battleLog">
+                    <!-- 戰鬥記錄將由JS動態生成 -->
+                </div>
+            </div>
+            
+            <!-- 音樂控制 -->
+            <div class="music-controls">
+                <button class="music-btn" id="musicToggleBtn" title="音樂開關">♪</button>
+                <button class="music-btn" id="soundToggleBtn" title="音效開關">🔊</button>
+            </div>
+            
+            <!-- 音量控制 -->
+            <div class="volume-slider" id="volumeSlider">
+                <div class="volume-track">
+                    <div class="volume-thumb" id="volumeThumb"></div>
+                </div>
+            </div>
+            
+            <!-- 能力按鈕 -->
+            <button class="ability-btn" id="dashBtn" title="衝刺">衝刺</button>
+            
+            <!-- 通知 -->
+            <div class="notification" id="notification"></div>
+            
+            <!-- 觸控控制 -->
+            <div class="touch-controls">
+                <div class="control-row">
+                    <div class="control-section">
+                        <div class="joystick-area" id="joystickArea">
+                            <div class="joystick-base"></div>
+                            <div class="joystick-handle" id="joystickHandle"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-section">
+                        <div class="action-buttons">
+                            <button class="action-btn" id="actionBtn" data-label="互動">
+                                ✨
+                                <span class="btn-label">互動</span>
+                            </button>
+                            <button class="action-btn" id="jumpBtn" data-label="跳躍">
+                                ⬆️
+                                <span class="btn-label">跳躍</span>
+                            </button>
+                            <button class="action-btn double" id="inventoryBtn" data-label="物品欄">
+                                🎒 物品欄
+                                <span class="btn-label"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="control-hint">
+                    虛擬搖桿控制移動 | 點擊按鈕執行動作
+                </div>
+            </div>
+            
+            <!-- 觸控引導 -->
+            <div class="touch-guide" id="touchGuide">
+                <div class="guide-content">
+                    <h3>星際探險者：地球歸途</h3>
+                    <p>使用左側虛擬搖桿移動角色</p>
+                    <div class="guide-gesture">🕹️</div>
+                    <p>右側按鈕功能：</p>
+                    <p>✨ 互動 - 與NPC對話或收集物品</p>
+                    <p>⬆️ 跳躍 - 跳過障礙物</p>
+                    <p>🎒 物品欄 - 查看和使用物品</p>
+                    <p>衝刺按鈕 - 快速移動（消耗能量）</p>
+                    <p>右上角按鈕可控制音樂和音效</p>
+                    <button class="action-btn double" id="startGameBtn" style="margin-top: 20px;">
+                        開始冒險
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 音效元素 -->
+    <audio id="bgMusic" loop></audio>
+    <audio id="battleMusic" loop></audio>
+    <audio id="clickSound"></audio>
+    <audio id="jumpSound"></audio>
+    <audio id="collectSound"></audio>
+    <audio id="attackSound"></audio>
+    <audio id="damageSound"></audio>
+    <audio id="victorySound"></audio>
+
+    <script>
+        // 遊戲狀態
+        const gameState = {
+            player: {
+                x: 100,
+                y: 300,
+                width: 40,
+                height: 60,
+                speed: 3,
+                dashSpeed: 9,
+                jumpForce: 12,
+                velocityY: 0,
+                isJumping: false,
+                health: 100,
+                maxHealth: 100,
+                fuel: 60,
+                maxFuel: 100,
+                energy: 80,
+                maxEnergy: 100,
+                credits: 50,
+                level: 1,
+                experience: 0,
+                experienceToNextLevel: 100,
+                inventory: ['應急口糧 x3', '醫療包 x1', '能量電池 x2'],
+                equippedWeapon: '雷射手槍',
+                equippedArmor: '基礎太空服',
+                abilities: {
+                    dash: { 
+                        cooldown: 2000, 
+                        lastUsed: 0, 
+                        active: false, 
+                        duration: 300 
+                    }
+                }
+            },
+            currentMap: 'asteroidField',
+            enemies: [],
+            npcs: [],
+            platforms: [],
+            items: [],
+            particles: [],
+            inBattle: false,
+            currentEnemy: null,
+            gameOver: false,
+            gameWin: false,
+            foundClues: 0,
+            totalClues: 5,
+            visitedMaps: [],
+            musicEnabled: true,
+            soundEnabled: true,
+            musicVolume: 0.5,
+            soundVolume: 0.7
+        };
+
+        // 觸控狀態
+        const touchState = {
+            joystick: {
+                active: false,
+                x: 0,
+                y: 0,
+                startX: 0,
+                startY: 0,
+                radius: 60,
+                touchId: null
+            },
+            buttons: {
+                action: { active: false, touchId: null },
+                jump: { active: false, touchId: null },
+                inventory: { active: false, touchId: null },
+                dash: { active: false, touchId: null }
+            },
+            activeTouches: new Map(),
+            lastTapTime: 0,
+            doubleTapThreshold: 300,
+            showVolumeSlider: false
+        };
+
+        // 地圖定義
+        const maps = {
+            asteroidField: {
+                name: '小行星帶',
+                width: 2000,
+                height: 600,
+                backgroundColor: '#0a0a2a',
+                platforms: [
+                    { x: 0, y: 400, width: 800, height: 200 },
+                    { x: 900, y: 350, width: 300, height: 250 },
+                    { x: 1300, y: 300, width: 400, height: 300 },
+                    { x: 1800, y: 400, width: 200, height: 200 }
+                ],
+                enemies: [
+                    { x: 500, y: 340, type: 'spacePirate', health: 50, direction: 1, patrolTimer: 0 },
+                    { x: 1100, y: 290, type: 'spacePirate', health: 50, direction: -1, patrolTimer: 0 },
+                    { x: 1500, y: 240, type: 'alienDrone', health: 30, direction: 1, patrolTimer: 0 }
+                ],
+                npcs: [
+                    { x: 700, y: 340, type: 'woundedExplorer', dialog: 'helpDialog' }
+                ],
+                items: [
+                    { x: 400, y: 340, type: 'fuelCell' },
+                    { x: 1000, y: 290, type: 'medkit' },
+                    { x: 1700, y: 340, type: 'starMap' }
+                ],
+                exit: { x: 1950, y: 340, width: 50, height: 60, targetMap: 'abandonedStation' }
+            },
+            abandonedStation: {
+                name: '廢棄空間站',
+                width: 2500,
+                height: 800,
+                backgroundColor: '#1a1a3a',
+                platforms: [
+                    { x: 0, y: 500, width: 600, height: 300 },
+                    { x: 700, y: 450, width: 400, height: 350 },
+                    { x: 1200, y: 400, width: 300, height: 400 },
+                    { x: 1600, y: 500, width: 400, height: 300 },
+                    { x: 2100, y: 450, width: 400, height: 350 }
+                ],
+                enemies: [
+                    { x: 300, y: 440, type: 'securityBot', health: 70, direction: 1, patrolTimer: 0 },
+                    { x: 900, y: 390, type: 'spacePirate', health: 50, direction: -1, patrolTimer: 0 },
+                    { x: 1400, y: 340, type: 'securityBot', health: 70, direction: 1, patrolTimer: 0 }
+                ],
+                npcs: [
+                    { x: 1850, y: 390, type: 'stationAI', dialog: 'aiDialog' }
+                ],
+                items: [
+                    { x: 800, y: 390, type: 'energyCore' },
+                    { x: 1350, y: 340, type: 'weaponUpgrade' },
+                    { x: 2200, y: 390, type: 'navigationModule' }
+                ],
+                exit: { x: 2450, y: 390, width: 50, height: 60, targetMap: 'nebula' }
+            },
+            nebula: {
+                name: '星雲區域',
+                width: 3000,
+                height: 900,
+                backgroundColor: '#2a1a4a',
+                platforms: [
+                    { x: 0, y: 600, width: 500, height: 300 },
+                    { x: 600, y: 550, width: 400, height: 350 },
+                    { x: 1100, y: 500, width: 300, height: 400 },
+                    { x: 1500, y: 450, width: 500, height: 450 },
+                    { x: 2100, y: 500, width: 400, height: 400 },
+                    { x: 2600, y: 550, width: 400, height: 350 }
+                ],
+                enemies: [
+                    { x: 400, y: 540, type: 'alienDrone', health: 30, direction: 1, patrolTimer: 0 },
+                    { x: 1000, y: 490, type: 'spacePirate', health: 50, direction: -1, patrolTimer: 0 },
+                    { x: 1700, y: 440, type: 'securityBot', health: 70, direction: 1, patrolTimer: 0 },
+                    { x: 2400, y: 490, type: 'alienDrone', health: 30, direction: -1, patrolTimer: 0 }
+                ],
+                npcs: [
+                    { x: 2300, y: 440, type: 'ancientAlien', dialog: 'alienDialog' }
+                ],
+                items: [
+                    { x: 900, y: 490, type: 'fuelCell' },
+                    { x: 1400, y: 440, type: 'medkit' },
+                    { x: 1900, y: 440, type: 'energyCore' },
+                    { x: 2800, y: 490, type: 'finalKey' }
+                ],
+                exit: { x: 2950, y: 490, width: 50, height: 60, targetMap: 'earth' }
+            },
+            earth: {
+                name: '地球',
+                width: 1500,
+                height: 600,
+                backgroundColor: '#0a2a4a',
+                platforms: [
+                    { x: 0, y: 400, width: 1500, height: 200 }
+                ],
+                enemies: [],
+                npcs: [
+                    { x: 750, y: 340, type: 'earthWelcome', dialog: 'earthDialog' }
+                ],
+                items: [],
+                exit: null
+            }
+        };
+
+        // 敵人定義
+        const enemyTypes = {
+            spacePirate: {
+                name: '太空海盜',
+                width: 40,
+                height: 60,
+                color: '#ff5252',
+                attack: 15,
+                defense: 5,
+                experience: 20,
+                speed: 1
+            },
+            alienDrone: {
+                name: '外星無人機',
+                width: 30,
+                height: 30,
+                color: '#8bc34a',
+                attack: 10,
+                defense: 3,
+                experience: 15,
+                speed: 1.5
+            },
+            securityBot: {
+                name: '安全機器人',
+                width: 45,
+                height: 45,
+                color: '#757575',
+                attack: 20,
+                defense: 10,
+                experience: 30,
+                speed: 0.8
+            }
+        };
+
+        // 音效系統
+        const audioManager = {
+            bgMusic: null,
+            battleMusic: null,
+            sounds: {},
+            
+            init: function() {
+                // 背景音樂 - 使用經典太空音樂（Holst: The Planets - Mars）
+                this.bgMusic = document.getElementById('bgMusic');
+                this.bgMusic.src = 'https://assets.mixkit.co/music/preview/mixkit-game-show-suspense-waiting-667.mp3';
+                this.bgMusic.loop = true;
+                this.bgMusic.volume = gameState.musicVolume;
+                
+                // 戰鬥音樂 - 搖滾風格
+                this.battleMusic = document.getElementById('battleMusic');
+                this.battleMusic.src = 'https://assets.mixkit.co/music/preview/mixkit-driving-rock-1091.mp3';
+                this.battleMusic.loop = true;
+                this.battleMusic.volume = gameState.musicVolume * 0.8;
+                
+                // 音效
+                this.sounds = {
+                    click: document.getElementById('clickSound'),
+                    jump: document.getElementById('jumpSound'),
+                    collect: document.getElementById('collectSound'),
+                    attack: document.getElementById('attackSound'),
+                    damage: document.getElementById('damageSound'),
+                    victory: document.getElementById('victorySound')
+                };
+                
+                // 設置音效
+                this.sounds.click.src = 'https://assets.mixkit.co/sfx/preview/mixkit-select-click-1109.mp3';
+                this.sounds.jump.src = 'https://assets.mixkit.co/sfx/preview/mixkit-jump-arcade-game-166.mp3';
+                this.sounds.collect.src = 'https://assets.mixkit.co/sfx/preview/mixkit-unlock-game-notification-253.mp3';
+                this.sounds.attack.src = 'https://assets.mixkit.co/sfx/preview/mixkit-laser-weapon-shot-1671.mp3';
+                this.sounds.damage.src = 'https://assets.mixkit.co/sfx/preview/mixkit-explosion-hit-1994.mp3';
+                this.sounds.victory.src = 'https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3';
+                
+                // 設置音量
+                Object.values(this.sounds).forEach(sound => {
+                    sound.volume = gameState.soundVolume;
+                });
+            },
+            
+            playSound: function(soundName) {
+                if (!gameState.soundEnabled) return;
+                
+                const sound = this.sounds[soundName];
+                if (sound) {
+                    sound.currentTime = 0;
+                    sound.play().catch(e => console.log('音效播放失敗:', e));
+                }
+            },
+            
+            playBackgroundMusic: function() {
+                if (!gameState.musicEnabled || this.bgMusic.paused) {
+                    this.bgMusic.play().catch(e => console.log('背景音樂播放失敗:', e));
+                }
+            },
+            
+            playBattleMusic: function() {
+                if (!gameState.musicEnabled || this.battleMusic.paused) {
+                    this.bgMusic.pause();
+                    this.battleMusic.currentTime = 0;
+                    this.battleMusic.play().catch(e => console.log('戰鬥音樂播放失敗:', e));
+                }
+            },
+            
+            stopBattleMusic: function() {
+                this.battleMusic.pause();
+                if (!this.bgMusic.paused) return;
+                this.bgMusic.play().catch(e => console.log('背景音樂播放失敗:', e));
+            },
+            
+            stopAllMusic: function() {
+                this.bgMusic.pause();
+                this.battleMusic.pause();
+            },
+            
+            setMusicVolume: function(volume) {
+                gameState.musicVolume = volume;
+                this.bgMusic.volume = volume;
+                this.battleMusic.volume = volume * 0.8;
+            },
+            
+            setSoundVolume: function(volume) {
+                gameState.soundVolume = volume;
+                Object.values(this.sounds).forEach(sound => {
+                    sound.volume = volume;
+                });
+            },
+            
+            toggleMusic: function() {
+                gameState.musicEnabled = !gameState.musicEnabled;
+                if (gameState.musicEnabled) {
+                    this.playBackgroundMusic();
+                } else {
+                    this.stopAllMusic();
+                }
+                return gameState.musicEnabled;
+            },
+            
+            toggleSound: function() {
+                gameState.soundEnabled = !gameState.soundEnabled;
+                return gameState.soundEnabled;
+            }
+        };
+
+        // 遊戲變量
+        let canvas, ctx;
+        let keys = {};
+        let camera = { x: 0, y: 0 };
+        let gravity = 0.5;
+        let lastTime = 0;
+        let currentDialog = null;
+        let battleLog = [];
+        let tutorialShown = false;
+
+        // 初始化遊戲
+        function init() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            
+            // 設置畫布大小
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // 初始化音效系統
+            audioManager.init();
+            
+            // 設置觸控事件
+            setupTouchControls();
+            
+            // 設置音樂控制
+            setupMusicControls();
+            
+            // 載入遊戲進度
+            if (!loadGame()) {
+                // 顯示觸控引導
+                showTouchGuide();
+            } else {
+                // 播放背景音樂
+                if (gameState.musicEnabled) {
+                    audioManager.playBackgroundMusic();
+                }
+            }
+            
+            // 開始遊戲循環
+            requestAnimationFrame(gameLoop);
+            
+            // 設置自動保存
+            setInterval(saveGame, 30000);
+        }
+
+        // 調整畫布大小
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        // 設置觸控控制
+        function setupTouchControls() {
+            const joystickArea = document.getElementById('joystickArea');
+            const joystickHandle = document.getElementById('joystickHandle');
+            const actionBtn = document.getElementById('actionBtn');
+            const jumpBtn = document.getElementById('jumpBtn');
+            const inventoryBtn = document.getElementById('inventoryBtn');
+            const dashBtn = document.getElementById('dashBtn');
+            const startGameBtn = document.getElementById('startGameBtn');
+            
+            // 虛擬搖桿觸控
+            joystickArea.addEventListener('touchstart', handleJoystickStart, { passive: false });
+            joystickArea.addEventListener('touchmove', handleJoystickMove, { passive: false });
+            joystickArea.addEventListener('touchend', handleJoystickEnd, { passive: false });
+            joystickArea.addEventListener('touchcancel', handleJoystickEnd, { passive: false });
+            
+            // 按鈕觸控
+            setupButtonTouch(actionBtn, 'action');
+            setupButtonTouch(jumpBtn, 'jump');
+            setupButtonTouch(inventoryBtn, 'inventory');
+            setupButtonTouch(dashBtn, 'dash');
+            
+            // 開始遊戲按鈕
+            startGameBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                createTouchFeedback(e);
+                audioManager.playSound('click');
+                startGame();
+            }, { passive: false });
+            
+            // 對話選擇觸控
+            document.addEventListener('touchstart', handleDialogTouch, { passive: false });
+            
+            // 戰鬥動作觸控
+            document.addEventListener('touchstart', handleBattleActionTouch, { passive: false });
+            
+            // 物品欄觸控
+            document.addEventListener('touchstart', handleInventoryTouch, { passive: false });
+            
+            // 防止滾動和縮放
+            document.addEventListener('touchmove', preventScroll, { passive: false });
+            document.addEventListener('gesturestart', preventZoom);
+            document.addEventListener('gesturechange', preventZoom);
+            document.addEventListener('gestureend', preventZoom);
+        }
+
+        // 設置按鈕觸控
+        function setupButtonTouch(button, buttonName) {
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const touch = e.changedTouches[0];
+                const touchId = touch.identifier;
+                
+                // 如果這個按鈕已經有觸控，忽略新的觸控
+                if (touchState.buttons[buttonName].active) return;
+                
+                touchState.buttons[buttonName].active = true;
+                touchState.buttons[buttonName].touchId = touchId;
+                touchState.activeTouches.set(touchId, { type: 'button', button: buttonName });
+                
+                // 視覺反饋
+                button.classList.add('pressed');
+                createTouchFeedback(e);
+                audioManager.playSound('click');
+                
+                // 執行按鈕動作
+                handleButtonAction(buttonName);
+                
+            }, { passive: false });
+            
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                for (const touch of e.changedTouches) {
+                    const touchId = touch.identifier;
+                    const touchInfo = touchState.activeTouches.get(touchId);
+                    
+                    if (touchInfo && touchInfo.type === 'button' && touchInfo.button === buttonName) {
+                        touchState.buttons[buttonName].active = false;
+                        touchState.buttons[buttonName].touchId = null;
+                        touchState.activeTouches.delete(touchId);
+                        button.classList.remove('pressed');
+                    }
+                }
+            }, { passive: false });
+            
+            button.addEventListener('touchcancel', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                touchState.buttons[buttonName].active = false;
+                touchState.buttons[buttonName].touchId = null;
+                button.classList.remove('pressed');
+            }, { passive: false });
+        }
+
+        // 設置音樂控制
+        function setupMusicControls() {
+            const musicToggleBtn = document.getElementById('musicToggleBtn');
+            const soundToggleBtn = document.getElementById('soundToggleBtn');
+            const volumeSlider = document.getElementById('volumeSlider');
+            const volumeThumb = document.getElementById('volumeThumb');
+            
+            // 音樂開關
+            musicToggleBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                createTouchFeedback(e);
+                audioManager.playSound('click');
+                
+                const enabled = audioManager.toggleMusic();
+                musicToggleBtn.classList.toggle('muted', !enabled);
+                musicToggleBtn.title = enabled ? '關閉音樂' : '開啟音樂';
+                
+                // 顯示/隱藏音量控制
+                touchState.showVolumeSlider = !touchState.showVolumeSlider;
+                volumeSlider.style.display = touchState.showVolumeSlider ? 'block' : 'none';
+                
+                // 設置音量控制位置
+                if (touchState.showVolumeSlider) {
+                    const volume = gameState.musicVolume;
+                    const thumbPosition = (1 - volume) * 100;
+                    volumeThumb.style.bottom = `${thumbPosition}%`;
+                }
+            }, { passive: false });
+            
+            // 音效開關
+            soundToggleBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                createTouchFeedback(e);
+                audioManager.playSound('click');
+                
+                const enabled = audioManager.toggleSound();
+                soundToggleBtn.classList.toggle('muted', !enabled);
+                soundToggleBtn.title = enabled ? '關閉音效' : '開啟音效';
+            }, { passive: false });
+            
+            // 音量控制
+            volumeSlider.addEventListener('touchstart', handleVolumeSliderStart, { passive: false });
+            document.addEventListener('touchstart', hideVolumeSlider, { passive: false });
+        }
+
+        // 處理音量控制
+        function handleVolumeSliderStart(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const slider = document.getElementById('volumeSlider');
+            const thumb = document.getElementById('volumeThumb');
+            const track = document.querySelector('.volume-track');
+            
+            const rect = track.getBoundingClientRect();
+            const touch = e.touches[0];
+            
+            // 計算音量
+            let relativeY = rect.bottom - touch.clientY;
+            relativeY = Math.max(0, Math.min(relativeY, rect.height));
+            
+            const volume = relativeY / rect.height;
+            
+            // 更新音量
+            audioManager.setMusicVolume(volume);
+            
+            // 更新拇指位置
+            thumb.style.bottom = `${(1 - volume) * 100}%`;
+        }
+
+        // 隱藏音量控制
+        function hideVolumeSlider(e) {
+            const slider = document.getElementById('volumeSlider');
+            const musicBtn = document.getElementById('musicToggleBtn');
+            
+            if (!slider.contains(e.target) && !musicBtn.contains(e.target)) {
+                slider.style.display = 'none';
+                touchState.showVolumeSlider = false;
+            }
+        }
+
+        // 處理虛擬搖桿開始
+        function handleJoystickStart(e) {
+            e.preventDefault();
+            
+            const rect = e.currentTarget.getBoundingClientRect();
+            for (const touch of e.changedTouches) {
+                const touchId = touch.identifier;
+                
+                // 檢查是否在搖桿區域內
+                if (touch.clientX < rect.left || touch.clientX > rect.right ||
+                    touch.clientY < rect.top || touch.clientY > rect.bottom) {
+                    continue;
+                }
+                
+                // 如果搖桿已經激活，忽略新的觸控
+                if (touchState.joystick.active) continue;
+                
+                touchState.joystick.active = true;
+                touchState.joystick.touchId = touchId;
+                touchState.joystick.startX = touch.clientX;
+                touchState.joystick.startY = touch.clientY;
+                touchState.joystick.x = 0;
+                touchState.joystick.y = 0;
+                
+                touchState.activeTouches.set(touchId, { type: 'joystick' });
+                
+                // 視覺反饋
+                updateJoystickVisual();
+                createTouchFeedback(e);
+                
+                break;
+            }
+        }
+
+        // 處理虛擬搖桿移動
+        function handleJoystickMove(e) {
+            e.preventDefault();
+            
+            if (!touchState.joystick.active) return;
+            
+            const touchId = touchState.joystick.touchId;
+            const touch = Array.from(e.touches).find(t => t.identifier === touchId);
+            
+            if (!touch) return;
+            
+            const dx = touch.clientX - touchState.joystick.startX;
+            const dy = touch.clientY - touchState.joystick.startY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // 限制搖桿移動範圍
+            if (distance > touchState.joystick.radius) {
+                touchState.joystick.x = (dx / distance) * touchState.joystick.radius;
+                touchState.joystick.y = (dy / distance) * touchState.joystick.radius;
+            } else {
+                touchState.joystick.x = dx;
+                touchState.joystick.y = dy;
+            }
+            
+            // 更新按鍵狀態
+            keys['ArrowLeft'] = touchState.joystick.x < -15;
+            keys['ArrowRight'] = touchState.joystick.x > 15;
+            keys['ArrowUp'] = touchState.joystick.y < -25;
+            keys['ArrowDown'] = touchState.joystick.y > 25;
+            
+            // 更新視覺
+            updateJoystickVisual();
+        }
+
+        // 處理虛擬搖桿結束
+        function handleJoystickEnd(e) {
+            e.preventDefault();
+            
+            for (const touch of e.changedTouches) {
+                const touchId = touch.identifier;
+                const touchInfo = touchState.activeTouches.get(touchId);
+                
+                if (touchInfo && touchInfo.type === 'joystick') {
+                    touchState.joystick.active = false;
+                    touchState.joystick.touchId = null;
+                    touchState.joystick.x = 0;
+                    touchState.joystick.y = 0;
+                    
+                    keys['ArrowLeft'] = false;
+                    keys['ArrowRight'] = false;
+                    keys['ArrowUp'] = false;
+                    keys['ArrowDown'] = false;
+                    
+                    touchState.activeTouches.delete(touchId);
+                    updateJoystickVisual();
+                }
+            }
+        }
+
+        // 更新搖桿視覺
+        function updateJoystickVisual() {
+            const joystickHandle = document.getElementById('joystickHandle');
+            const joystickBase = document.querySelector('.joystick-base');
+            
+            if (touchState.joystick.active) {
+                const x = touchState.joystick.x;
+                const y = touchState.joystick.y;
+                
+                joystickHandle.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+                joystickHandle.style.background = `rgba(${74 + Math.abs(x)}, ${91 + Math.abs(y)}, 199, 0.9)`;
+            } else {
+                joystickHandle.style.transform = 'translate(-50%, -50%)';
+                joystickHandle.style.background = 'rgba(74, 91, 199, 0.9)';
+            }
+        }
+
+        // 處理按鈕動作
+        function handleButtonAction(buttonName) {
+            switch(buttonName) {
+                case 'action':
+                    performAction();
+                    break;
+                case 'jump':
+                    if (!gameState.player.isJumping) {
+                        gameState.player.velocityY = -gameState.player.jumpForce;
+                        gameState.player.isJumping = true;
+                        audioManager.playSound('jump');
+                        createParticles(
+                            gameState.player.x + gameState.player.width/2,
+                            gameState.player.y + gameState.player.height,
+                            10, '#4fc3f7'
+                        );
+                    }
+                    break;
+                case 'inventory':
+                    toggleInventory();
+                    break;
+                case 'dash':
+                    activateDash();
+                    break;
+            }
+        }
+
+        // 處理對話觸控
+        function handleDialogTouch(e) {
+            const dialogBox = document.getElementById('dialogBox');
+            if (dialogBox.style.display !== 'block') return;
+            
+            const choices = document.querySelectorAll('.dialog-choice');
+            for (const choice of choices) {
+                const rect = choice.getBoundingClientRect();
+                for (const touch of e.changedTouches) {
+                    if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+                        touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                        e.preventDefault();
+                        createTouchFeedback(e);
+                        audioManager.playSound('click');
+                        choice.click();
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 處理戰鬥動作觸控
+        function handleBattleActionTouch(e) {
+            const battleUI = document.getElementById('battleUI');
+            if (battleUI.style.display !== 'flex') return;
+            
+            const actions = document.querySelectorAll('.battle-action');
+            for (const action of actions) {
+                const rect = action.getBoundingClientRect();
+                for (const touch of e.changedTouches) {
+                    if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+                        touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                        e.preventDefault();
+                        createTouchFeedback(e);
+                        audioManager.playSound('click');
+                        action.click();
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 處理物品欄觸控
+        function handleInventoryTouch(e) {
+            const inventoryPanel = document.getElementById('inventoryPanel');
+            if (inventoryPanel.style.display !== 'block') return;
+            
+            const items = document.querySelectorAll('.inventory-item');
+            for (const item of items) {
+                const rect = item.getBoundingClientRect();
+                for (const touch of e.changedTouches) {
+                    if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+                        touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                        e.preventDefault();
+                        createTouchFeedback(e);
+                        audioManager.playSound('click');
+                        item.click();
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 創建觸控反饋
+        function createTouchFeedback(e) {
+            const touch = e.changedTouches[0];
+            const feedback = document.createElement('div');
+            feedback.className = 'btn-touch-feedback';
+            feedback.style.left = `${touch.clientX}px`;
+            feedback.style.top = `${touch.clientY}px`;
+            
+            document.body.appendChild(feedback);
+            
+            setTimeout(() => {
+                feedback.remove();
+            }, 300);
+        }
+
+        // 防止滾動
+        function preventScroll(e) {
+            if (touchState.joystick.active || 
+                Object.values(touchState.buttons).some(btn => btn.active)) {
+                e.preventDefault();
+            }
+        }
+
+        // 防止縮放
+        function preventZoom(e) {
+            e.preventDefault();
+        }
+
+        // 開始遊戲
+        function startGame() {
+            document.getElementById('touchGuide').style.display = 'none';
+            tutorialShown = true;
+            loadMap(gameState.currentMap);
+            
+            // 播放背景音樂
+            if (gameState.musicEnabled) {
+                audioManager.playBackgroundMusic();
+            }
+        }
+
+        // 顯示觸控引導
+        function showTouchGuide() {
+            document.getElementById('touchGuide').style.display = 'flex';
+        }
+
+        // 載入地圖
+        function loadMap(mapId) {
+            const map = maps[mapId];
+            if (!map) return;
+            
+            gameState.currentMap = mapId;
+            gameState.platforms = map.platforms || [];
+            gameState.enemies = map.enemies || [];
+            gameState.npcs = map.npcs || [];
+            gameState.items = map.items || [];
+            
+            // 重置玩家位置
+            gameState.player.x = 100;
+            gameState.player.y = 300;
+            gameState.player.velocityY = 0;
+            gameState.player.isJumping = false;
+            
+            // 添加到已訪問地圖
+            if (!gameState.visitedMaps.includes(mapId)) {
+                gameState.visitedMaps.push(mapId);
+            }
+            
+            updateMinimap();
+            
+            showNotification(`到達：${map.name}`);
+        }
+
+        // 遊戲主循環
+        function gameLoop(timestamp) {
+            const deltaTime = timestamp - lastTime || 0;
+            lastTime = timestamp;
+            
+            // 清空畫布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 繪製背景
+            drawBackground();
+            
+            // 更新遊戲狀態
+            if (!gameState.inBattle && !gameState.gameOver && !gameState.gameWin) {
+                updatePlayer(deltaTime);
+                updateCamera();
+                checkCollisions();
+                updateEnemies();
+            }
+            
+            // 繪製遊戲元素
+            drawPlatforms();
+            drawItems();
+            drawNPCs();
+            drawEnemies();
+            drawPlayer();
+            drawExit();
+            
+            // 更新UI
+            updateUI();
+            
+            // 更新能力按鈕冷卻
+            updateAbilityCooldowns();
+            
+            // 檢查遊戲狀態
+            checkGameStatus();
+            
+            // 繼續遊戲循環
+            if (!gameState.gameOver && !gameState.gameWin) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // 繪製背景
+        function drawBackground() {
+            const map = maps[gameState.currentMap];
+            ctx.fillStyle = map.backgroundColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 繪製星星
+            ctx.fillStyle = 'white';
+            for (let i = 0; i < 100; i++) {
+                const x = (i * 31) % map.width;
+                const y = (i * 17) % map.height;
+                const size = (i % 3) + 1;
+                
+                if (x >= camera.x && x <= camera.x + canvas.width && 
+                    y >= camera.y && y <= camera.y + canvas.height) {
+                    ctx.beginPath();
+                    ctx.arc(x - camera.x, y - camera.y, size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            // 繪製星雲效果
+            if (gameState.currentMap === 'nebula') {
+                ctx.fillStyle = 'rgba(128, 0, 255, 0.1)';
+                for (let i = 0; i < 5; i++) {
+                    const x = (i * 400 + Date.now() * 0.01) % map.width;
+                    const y = 200 + Math.sin(i) * 100;
+                    const radius = 100 + Math.sin(Date.now() * 0.001 + i) * 50;
+                    
+                    const gradient = ctx.createRadialGradient(
+                        x - camera.x, y - camera.y, 0,
+                        x - camera.x, y - camera.y, radius
+                    );
+                    gradient.addColorStop(0, 'rgba(128, 0, 255, 0.3)');
+                    gradient.addColorStop(1, 'rgba(128, 0, 255, 0)');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(x - camera.x, y - camera.y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        // 更新玩家
+        function updatePlayer(deltaTime) {
+            const player = gameState.player;
+            
+            // 檢查衝刺狀態
+            const dashAbility = player.abilities.dash;
+            let currentSpeed = player.speed;
+            
+            if (dashAbility.active) {
+                currentSpeed = player.dashSpeed;
+                dashAbility.duration -= deltaTime;
+                
+                if (dashAbility.duration <= 0) {
+                    dashAbility.active = false;
+                }
+            }
+            
+            // 水平移動
+            if (keys['ArrowLeft']) {
+                player.x -= currentSpeed;
+            }
+            if (keys['ArrowRight']) {
+                player.x += currentSpeed;
+            }
+            
+            // 垂直移動（跳躍/重力）
+            player.velocityY += gravity;
+            player.y += player.velocityY;
+            
+            // 檢查平台碰撞
+            let onGround = false;
+            for (const platform of gameState.platforms) {
+                if (checkCollision(player, platform)) {
+                    if (player.velocityY > 0 && player.y + player.height > platform.y) {
+                        player.y = platform.y - player.height;
+                        player.velocityY = 0;
+                        player.isJumping = false;
+                        onGround = true;
+                    }
+                }
+            }
+            
+            // 檢查地圖邊界
+            const map = maps[gameState.currentMap];
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > map.width) player.x = map.width - player.width;
+            if (player.y + player.height > map.height) {
+                player.y = map.height - player.height;
+                player.velocityY = 0;
+                player.isJumping = false;
+                onGround = true;
+            }
+            
+            // 如果不在地面上，則標記為跳躍中
+            if (!onGround && player.velocityY !== 0) {
+                player.isJumping = true;
+            }
+            
+            // 自然消耗能量
+            if (player.velocityY !== 0 || keys['ArrowLeft'] || keys['ArrowRight']) {
+                player.energy = Math.max(0, player.energy - 0.01);
+            }
+            
+            // 更新小地圖玩家位置
+            updateMinimap();
+        }
+
+        // 檢查碰撞
+        function checkCollisions() {
+            const player = gameState.player;
+            
+            // 檢查物品碰撞
+            for (let i = gameState.items.length - 1; i >= 0; i--) {
+                const item = gameState.items[i];
+                const itemRect = {
+                    x: item.x,
+                    y: item.y,
+                    width: 30,
+                    height: 30
+                };
+                
+                if (checkCollision(player, itemRect)) {
+                    collectItem(item);
+                    gameState.items.splice(i, 1);
+                }
+            }
+            
+            // 檢查NPC碰撞
+            for (const npc of gameState.npcs) {
+                const npcRect = {
+                    x: npc.x,
+                    y: npc.y,
+                    width: 40,
+                    height: 60
+                };
+                
+                if (checkCollision(player, npcRect)) {
+                    showDialog(npc.dialog);
+                    break;
+                }
+            }
+            
+            // 檢查敵人碰撞
+            for (const enemy of gameState.enemies) {
+                const enemyType = enemyTypes[enemy.type];
+                const enemyRect = {
+                    x: enemy.x,
+                    y: enemy.y,
+                    width: enemyType.width,
+                    height: enemyType.height
+                };
+                
+                if (checkCollision(player, enemyRect)) {
+                    startBattle(enemy);
+                    break;
+                }
+            }
+            
+            // 檢查出口碰撞
+            const map = maps[gameState.currentMap];
+            if (map.exit && checkCollision(player, map.exit)) {
+                if (map.name === '星雲區域' && gameState.foundClues < 3) {
+                    showNotification('需要收集至少3個線索才能進入');
+                    return;
+                }
+                loadMap(map.exit.targetMap);
+            }
+        }
+
+        // 碰撞檢測
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        // 更新攝像機
+        function updateCamera() {
+            const player = gameState.player;
+            const map = maps[gameState.currentMap];
+            
+            // 將玩家置於屏幕中央
+            camera.x = player.x - canvas.width / 2 + player.width / 2;
+            camera.y = player.y - canvas.height / 2 + player.height / 2;
+            
+            // 限制攝像機不超出地圖邊界
+            camera.x = Math.max(0, Math.min(camera.x, map.width - canvas.width));
+            camera.y = Math.max(0, Math.min(camera.y, map.height - canvas.height));
+        }
+
+        // 更新敵人
+        function updateEnemies() {
+            const player = gameState.player;
+            
+            for (const enemy of gameState.enemies) {
+                const enemyType = enemyTypes[enemy.type];
+                const distanceToPlayer = Math.abs(player.x - enemy.x);
+                
+                // 如果玩家在附近，追蹤玩家
+                if (distanceToPlayer < 300 && Math.abs(player.y - enemy.y) < 100) {
+                    const direction = player.x > enemy.x ? 1 : -1;
+                    enemy.x += enemyType.speed * direction;
+                    
+                    // 如果夠近，嘗試攻擊
+                    if (distanceToPlayer < 80 && Math.random() < 0.01) {
+                        enemy.attacking = true;
+                        setTimeout(() => enemy.attacking = false, 500);
+                    }
+                } else {
+                    // 巡邏行為
+                    if (!enemy.patrolTimer) {
+                        enemy.patrolTimer = 0;
+                        enemy.direction = Math.random() > 0.5 ? 1 : -1;
+                    }
+                    
+                    enemy.patrolTimer++;
+                    if (enemy.patrolTimer > 120) {
+                        enemy.direction *= -1;
+                        enemy.patrolTimer = 0;
+                    }
+                    
+                    enemy.x += enemyType.speed * enemy.direction;
+                }
+                
+                // 檢查平台邊緣
+                let onPlatform = false;
+                for (const platform of gameState.platforms) {
+                    if (enemy.x >= platform.x && 
+                        enemy.x + enemyType.width <= platform.x + platform.width &&
+                        Math.abs(enemy.y + enemyType.height - platform.y) < 5) {
+                        onPlatform = true;
+                        break;
+                    }
+                }
+                
+                if (!onPlatform && enemy.direction) {
+                    enemy.direction *= -1;
+                }
+            }
+        }
+
+        // 收集物品
+        function collectItem(item) {
+            audioManager.playSound('collect');
+            
+            switch(item.type) {
+                case 'fuelCell':
+                    gameState.player.fuel = Math.min(gameState.player.maxFuel, gameState.player.fuel + 30);
+                    showNotification('獲得燃料電池，燃料+30');
+                    break;
+                case 'medkit':
+                    gameState.player.health = Math.min(gameState.player.maxHealth, gameState.player.health + 40);
+                    showNotification('獲得醫療包，生命值+40');
+                    break;
+                case 'starMap':
+                    gameState.player.inventory.push('星圖碎片');
+                    gameState.foundClues++;
+                    showNotification('獲得星圖碎片，線索+' + gameState.foundClues + '/' + gameState.totalClues);
+                    break;
+                case 'energyCore':
+                    gameState.player.energy = Math.min(gameState.player.maxEnergy, gameState.player.energy + 50);
+                    showNotification('獲得能量核心，能量+50');
+                    break;
+                case 'weaponUpgrade':
+                    gameState.player.equippedWeapon = '強化雷射槍';
+                    showNotification('武器升級為強化雷射槍');
+                    break;
+                case 'navigationModule':
+                    gameState.player.inventory.push('導航模組');
+                    gameState.foundClues++;
+                    showNotification('獲得導航模組，線索+' + gameState.foundClues + '/' + gameState.totalClues);
+                    break;
+                case 'finalKey':
+                    gameState.player.inventory.push('最終鑰匙');
+                    gameState.foundClues++;
+                    showNotification('獲得最終鑰匙，線索+' + gameState.foundClues + '/' + gameState.totalClues);
+                    break;
+            }
+            
+            updateUI();
+        }
+
+        // 激活衝刺
+        function activateDash() {
+            const player = gameState.player;
+            const dashAbility = player.abilities.dash;
+            const now = Date.now();
+            
+            if (now - dashAbility.lastUsed > dashAbility.cooldown && player.energy > 10) {
+                dashAbility.active = true;
+                dashAbility.duration = 300;
+                dashAbility.lastUsed = now;
+                player.energy -= 10;
+                
+                audioManager.playSound('attack');
+                showNotification('衝刺啟動！');
+                
+                updateAbilityCooldowns();
+            }
+        }
+
+        // 更新能力冷卻顯示
+        function updateAbilityCooldowns() {
+            const dashBtn = document.getElementById('dashBtn');
+            const dashAbility = gameState.player.abilities.dash;
+            const now = Date.now();
+            const cooldownRemaining = dashAbility.cooldown - (now - dashAbility.lastUsed);
+            
+            if (cooldownRemaining > 0) {
+                dashBtn.classList.add('cooldown');
+                dashBtn.title = `冷卻中：${Math.ceil(cooldownRemaining/1000)}秒`;
+            } else {
+                dashBtn.classList.remove('cooldown');
+                dashBtn.title = '衝刺（消耗10能量）';
+            }
+        }
+
+        // 檢查遊戲狀態
+        function checkGameStatus() {
+            const player = gameState.player;
+            
+            // 檢查資源警告
+            if (player.health / player.maxHealth < 0.3) {
+                document.getElementById('healthBarContainer').classList.add('warning');
+            } else {
+                document.getElementById('healthBarContainer').classList.remove('warning');
+            }
+            
+            if (player.fuel / player.maxFuel < 0.2) {
+                document.getElementById('fuelBarContainer').classList.add('warning');
+            } else {
+                document.getElementById('fuelBarContainer').classList.remove('warning');
+            }
+            
+            if (player.energy / player.maxEnergy < 0.15) {
+                document.getElementById('energyBarContainer').classList.add('warning');
+            } else {
+                document.getElementById('energyBarContainer').classList.remove('warning');
+            }
+            
+            // 檢查遊戲結束
+            if (player.health <= 0 && !gameState.gameOver) {
+                gameState.gameOver = true;
+                showGameOver();
+            }
+            
+            // 檢查遊戲勝利
+            if (gameState.currentMap === 'earth' && gameState.foundClues >= gameState.totalClues && !gameState.gameWin) {
+                gameState.gameWin = true;
+                showGameWin();
+            }
+        }
+
+        // 開始戰鬥
+        function startBattle(enemy) {
+            gameState.inBattle = true;
+            gameState.currentEnemy = enemy;
+            
+            // 播放戰鬥音樂
+            if (gameState.musicEnabled) {
+                audioManager.playBattleMusic();
+            }
+            
+            // 顯示戰鬥界面
+            const battleUI = document.getElementById('battleUI');
+            battleUI.style.display = 'flex';
+            
+            // 更新敵人信息
+            const enemyType = enemyTypes[enemy.type];
+            document.getElementById('enemyName').textContent = enemyType.name;
+            document.getElementById('enemyHealthBar').style.width = (enemy.health / 50 * 100) + '%';
+            
+            // 清空戰鬥記錄
+            battleLog = [];
+            updateBattleLog();
+            
+            // 設置戰鬥行動
+            setupBattleActions();
+            
+            showNotification('進入戰鬥！');
+        }
+
+        // 結束戰鬥
+        function endBattle(victory) {
+            gameState.inBattle = false;
+            document.getElementById('battleUI').style.display = 'none';
+            
+            // 停止戰鬥音樂
+            audioManager.stopBattleMusic();
+            
+            if (victory) {
+                // 移除敵人
+                const index = gameState.enemies.indexOf(gameState.currentEnemy);
+                if (index > -1) {
+                    gameState.enemies.splice(index, 1);
+                }
+                
+                // 獎勵玩家
+                const enemyType = enemyTypes[gameState.currentEnemy.type];
+                addExperience(enemyType.experience);
+                gameState.player.credits += enemyType.experience * 2;
+                addBattleLog(`擊敗${enemyType.name}，獲得${enemyType.experience}經驗和${enemyType.experience * 2}星際幣`);
+                
+                // 恢復少量生命值
+                gameState.player.health = Math.min(gameState.player.maxHealth, gameState.player.health + 10);
+                
+                audioManager.playSound('victory');
+            }
+            
+            gameState.currentEnemy = null;
+            updateUI();
+        }
+
+        // 添加經驗值
+        function addExperience(amount) {
+            gameState.player.experience += amount;
+            if (gameState.player.experience >= gameState.player.experienceToNextLevel) {
+                levelUp();
+            }
+            updateUI();
+        }
+
+        // 升級
+        function levelUp() {
+            gameState.player.level++;
+            gameState.player.experience = 0;
+            gameState.player.experienceToNextLevel = Math.floor(gameState.player.experienceToNextLevel * 1.5);
+            gameState.player.maxHealth += 20;
+            gameState.player.health = gameState.player.maxHealth;
+            gameState.player.maxEnergy += 10;
+            gameState.player.energy = gameState.player.maxEnergy;
+            
+            showNotification(`升級到 ${gameState.player.level} 級！`);
+            addBattleLog(`升級到 ${gameState.player.level} 級！`);
+        }
+
+        // 設置戰鬥行動
+        function setupBattleActions() {
+            const battleActions = document.getElementById('battleActions');
+            battleActions.innerHTML = '';
+            
+            const actions = [
+                { name: '攻擊', type: 'attack', cost: 5 },
+                { name: '防禦', type: 'defend', cost: 0 },
+                { name: '使用物品', type: 'item', cost: 0 },
+                { name: '逃跑', type: 'escape', cost: 10 }
+            ];
+            
+            actions.forEach(action => {
+                const button = document.createElement('div');
+                button.className = 'battle-action';
+                button.textContent = action.name;
+                button.addEventListener('click', () => performBattleAction(action.type));
+                battleActions.appendChild(button);
+            });
+        }
+
+        // 執行戰鬥行動
+        function performBattleAction(action) {
+            if (!gameState.currentEnemy) return;
+            
+            const player = gameState.player;
+            const enemy = gameState.currentEnemy;
+            const enemyType = enemyTypes[enemy.type];
+            
+            // 檢查能量是否足夠
+            if (player.energy < 5 && action !== 'defend') {
+                addBattleLog('能量不足！');
+                return;
+            }
+            
+            switch(action) {
+                case 'attack':
+                    // 玩家攻擊
+                    const playerDamage = Math.max(1, 15 + Math.floor(Math.random() * 10) - enemyType.defense);
+                    enemy.health -= playerDamage;
+                    player.energy -= 5;
+                    audioManager.playSound('attack');
+                    addBattleLog(`你對${enemyType.name}造成${playerDamage}點傷害`);
+                    
+                    // 敵人反擊
+                    if (enemy.health > 0) {
+                        const enemyDamage = Math.max(1, enemyType.attack + Math.floor(Math.random() * 5));
+                        player.health -= enemyDamage;
+                        audioManager.playSound('damage');
+                        addBattleLog(`${enemyType.name}對你造成${enemyDamage}點傷害`);
+                    }
+                    break;
+                    
+                case 'defend':
+                    // 防禦，減少下一次傷害
+                    addBattleLog('你採取防禦姿態，下次受到的傷害減半');
+                    
+                    // 敵人攻擊
+                    const reducedDamage = Math.max(1, Math.floor((enemyType.attack + Math.floor(Math.random() * 5)) / 2));
+                    player.health -= reducedDamage;
+                    audioManager.playSound('damage');
+                    addBattleLog(`${enemyType.name}對你造成${reducedDamage}點傷害（防禦生效）`);
+                    break;
+                    
+                case 'item':
+                    // 使用物品
+                    showInventory(true);
+                    return;
+                    
+                case 'escape':
+                    // 嘗試逃跑
+                    player.energy -= 10;
+                    const escapeChance = Math.random();
+                    if (escapeChance > 0.5) {
+                        addBattleLog('你成功逃脫了戰鬥');
+                        endBattle(false);
+                        return;
+                    } else {
+                        addBattleLog('逃跑失敗！');
+                        // 敵人攻擊
+                        const escapeDamage = Math.max(1, enemyType.attack + Math.floor(Math.random() * 5));
+                        player.health -= escapeDamage;
+                        audioManager.playSound('damage');
+                        addBattleLog(`${enemyType.name}對你造成${escapeDamage}點傷害`);
+                    }
+                    break;
+            }
+            
+            // 更新UI
+            document.getElementById('enemyHealthBar').style.width = Math.max(0, (enemy.health / 50 * 100)) + '%';
+            updateUI();
+            updateBattleLog();
+            
+            // 檢查戰鬥結果
+            if (enemy.health <= 0) {
+                addBattleLog(`你擊敗了${enemyType.name}！`);
+                setTimeout(() => endBattle(true), 1000);
+            } else if (player.health <= 0) {
+                addBattleLog('你被擊敗了...');
+                gameState.gameOver = true;
+                setTimeout(() => {
+                    endBattle(false);
+                    showGameOver();
+                }, 1000);
+            }
+        }
+
+        // 添加戰鬥記錄
+        function addBattleLog(message) {
+            battleLog.unshift(message);
+            if (battleLog.length > 5) {
+                battleLog.pop();
+            }
+        }
+
+        // 更新戰鬥記錄
+        function updateBattleLog() {
+            const battleLogElement = document.getElementById('battleLog');
+            battleLogElement.innerHTML = '';
+            
+            battleLog.forEach(log => {
+                const logEntry = document.createElement('div');
+                logEntry.className = 'log-entry';
+                logEntry.textContent = log;
+                battleLogElement.appendChild(logEntry);
+            });
+        }
+
+        // 執行動作（互動按鈕）
+        function performAction() {
+            // 檢查附近是否有可互動對象
+            const player = gameState.player;
+            
+            // 檢查NPC
+            for (const npc of gameState.npcs) {
+                const distance = Math.sqrt(
+                    Math.pow(player.x - npc.x, 2) + Math.pow(player.y - npc.y, 2)
+                );
+                
+                if (distance < 100) {
+                    showDialog(npc.dialog);
+                    return;
+                }
+            }
+            
+            // 檢查物品
+            for (const item of gameState.items) {
+                const distance = Math.sqrt(
+                    Math.pow(player.x - item.x, 2) + Math.pow(player.y - item.y, 2)
+                );
+                
+                if (distance < 80) {
+                    collectItem(item);
+                    const index = gameState.items.indexOf(item);
+                    if (index > -1) {
+                        gameState.items.splice(index, 1);
+                    }
+                    return;
+                }
+            }
+            
+            // 如果沒有可互動對象，檢查附近是否有隱藏區域
+            showNotification('使用掃描器...附近沒有發現可互動對象');
+        }
+
+        // 顯示對話框
+        function showDialog(dialogId) {
+            const dialogs = {
+                helpDialog: {
+                    title: '受傷的探險家',
+                    text: '謝謝你找到我！我的飛船被太空海盜摧毀了...我這裡有一張星圖碎片，對你可能有用。',
+                    choices: [
+                        { text: '接受星圖碎片', action: 'takeMap' },
+                        { text: '詢問太空海盜的情報', action: 'askInfo' },
+                        { text: '告別', action: 'leave' }
+                    ]
+                },
+                aiDialog: {
+                    title: '空間站AI',
+                    text: '歡迎，人類。這個空間站已經廢棄很久了。如果你在尋找地球，我建議你前往星雲區域，那裡可能有線索。',
+                    choices: [
+                        { text: '詢問地球的線索', action: 'askEarth' },
+                        { text: '請求系統訪問權限', action: 'requestAccess' },
+                        { text: '離開', action: 'leave' }
+                    ]
+                },
+                alienDialog: {
+                    title: '古老外星人',
+                    text: '地球...遙遠的記憶。要找到它，你需要收集三個鑰匙：星圖、導航模組和最終鑰匙。',
+                    choices: [
+                        { text: '感謝情報', action: 'thankAlien' },
+                        { text: '詢問更多細節', action: 'askDetails' },
+                        { text: '離開', action: 'leave' }
+                    ]
+                },
+                earthDialog: {
+                    title: '地球歡迎站',
+                    text: gameState.foundClues >= gameState.totalClues ? 
+                         '歡迎回家，探險家！你成功收集了所有線索，找到了返回地球的路。' :
+                         '你還需要收集更多線索才能找到地球。',
+                    choices: gameState.foundClues >= gameState.totalClues ? [
+                        { text: '慶祝勝利！', action: 'celebrate' }
+                    ] : [
+                        { text: '繼續尋找線索', action: 'continueSearch' }
+                    ]
+                }
+            };
+            
+            const dialog = dialogs[dialogId];
+            if (!dialog) return;
+            
+            currentDialog = dialog;
+            
+            const dialogBox = document.getElementById('dialogBox');
+            document.getElementById('dialogTitle').textContent = dialog.title;
+            document.getElementById('dialogText').textContent = dialog.text;
+            
+            const dialogChoices = document.getElementById('dialogChoices');
+            dialogChoices.innerHTML = '';
+            
+            dialog.choices.forEach(choice => {
+                const choiceElement = document.createElement('div');
+                choiceElement.className = 'dialog-choice';
+                choiceElement.textContent = choice.text;
+                choiceElement.addEventListener('click', () => handleDialogChoice(choice.action));
+                dialogChoices.appendChild(choiceElement);
+            });
+            
+            dialogBox.style.display = 'block';
+        }
+
+        // 處理對話選擇
+        function handleDialogChoice(action) {
+            const dialogBox = document.getElementById('dialogBox');
+            dialogBox.style.display = 'none';
+            
+            switch(action) {
+                case 'takeMap':
+                    gameState.player.inventory.push('星圖碎片');
+                    gameState.foundClues++;
+                    showNotification('獲得星圖碎片，線索+' + gameState.foundClues + '/' + gameState.totalClues);
+                    break;
+                case 'askInfo':
+                    showNotification('太空海盜通常在資源豐富的區域活動，小心他們的埋伏');
+                    break;
+                case 'askEarth':
+                    showNotification('地球的坐標被隱藏在三個導航信標中，你需要找到它們');
+                    break;
+                case 'requestAccess':
+                    gameState.player.inventory.push('空間站訪問卡');
+                    showNotification('獲得空間站訪問卡');
+                    break;
+                case 'thankAlien':
+                    showNotification('外星人點了點頭，消失在光芒中...');
+                    break;
+                case 'askDetails':
+                    showNotification('第一個鑰匙在小行星帶，第二個在空間站，第三個在星雲深處');
+                    break;
+                case 'celebrate':
+                    gameState.gameWin = true;
+                    audioManager.playSound('victory');
+                    showGameWin();
+                    break;
+                case 'continueSearch':
+                    showNotification('繼續尋找線索...');
+                    break;
+                case 'leave':
+                    // 不做任何事
+                    break;
+            }
+            
+            updateUI();
+        }
+
+        // 切換物品欄顯示
+        function toggleInventory() {
+            const inventoryPanel = document.getElementById('inventoryPanel');
+            if (inventoryPanel.style.display === 'block') {
+                inventoryPanel.style.display = 'none';
+            } else {
+                showInventory(false);
+            }
+        }
+
+        // 顯示物品欄
+        function showInventory(inBattle = false) {
+            const inventoryPanel = document.getElementById('inventoryPanel');
+            const inventoryItems = document.getElementById('inventoryItems');
+            
+            inventoryItems.innerHTML = '';
+            
+            gameState.player.inventory.forEach((item, index) => {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'inventory-item';
+                itemElement.textContent = item;
+                itemElement.addEventListener('click', () => useItem(item, index, inBattle));
+                inventoryItems.appendChild(itemElement);
+            });
+            
+            inventoryPanel.style.display = 'block';
+        }
+
+        // 使用物品
+        function useItem(item, index, inBattle) {
+            let used = false;
+            
+            if (item.includes('醫療包')) {
+                gameState.player.health = Math.min(gameState.player.maxHealth, gameState.player.health + 40);
+                audioManager.playSound('collect');
+                showNotification('使用醫療包，恢復40點生命值');
+                used = true;
+            } else if (item.includes('能量電池')) {
+                gameState.player.energy = Math.min(gameState.player.maxEnergy, gameState.player.energy + 30);
+                audioManager.playSound('collect');
+                showNotification('使用能量電池，恢復30點能量');
+                used = true;
+            } else if (item.includes('應急口糧')) {
+                gameState.player.health = Math.min(gameState.player.maxHealth, gameState.player.health + 15);
+                gameState.player.energy = Math.min(gameState.player.maxEnergy, gameState.player.energy + 10);
+                audioManager.playSound('collect');
+                showNotification('使用應急口糧，恢復15點生命值和10點能量');
+                used = true;
+            }
+            
+            if (used) {
+                // 減少物品數量或移除
+                if (item.includes('x')) {
+                    const parts = item.split(' x');
+                    const itemName = parts[0];
+                    let count = parseInt(parts[1]) - 1;
+                    
+                    if (count > 0) {
+                        gameState.player.inventory[index] = `${itemName} x${count}`;
+                    } else {
+                        gameState.player.inventory.splice(index, 1);
+                    }
+                } else {
+                    gameState.player.inventory.splice(index, 1);
+                }
+                
+                updateUI();
+                
+                // 如果在戰鬥中，更新戰鬥界面
+                if (inBattle) {
+                    document.getElementById('inventoryPanel').style.display = 'none';
+                    updateBattleLog();
+                }
+            }
+        }
+
+        // 顯示通知
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 2000);
+        }
+
+        // 更新UI
+        function updateUI() {
+            const player = gameState.player;
+            
+            // 更新數值
+            document.getElementById('healthValue').textContent = player.health;
+            document.getElementById('fuelValue').textContent = player.fuel;
+            document.getElementById('energyValue').textContent = Math.floor(player.energy);
+            document.getElementById('creditsValue').textContent = player.credits;
+            document.getElementById('levelValue').textContent = player.level;
+            
+            // 更新進度條
+            document.getElementById('healthBar').style.width = (player.health / player.maxHealth * 100) + '%';
+            document.getElementById('fuelBar').style.width = (player.fuel / player.maxFuel * 100) + '%';
+            document.getElementById('energyBar').style.width = (player.energy / player.maxEnergy * 100) + '%';
+        }
+
+        // 更新小地圖
+        function updateMinimap() {
+            const player = gameState.player;
+            const map = maps[gameState.currentMap];
+            const minimapPlayer = document.getElementById('minimapPlayer');
+            
+            // 計算玩家在小地圖上的位置
+            const xPercent = (player.x / map.width) * 100;
+            const yPercent = (player.y / map.height) * 100;
+            
+            minimapPlayer.style.left = `${xPercent}%`;
+            minimapPlayer.style.top = `${yPercent}%`;
+        }
+
+        // 顯示遊戲結束
+        function showGameOver() {
+            const dialogBox = document.getElementById('dialogBox');
+            document.getElementById('dialogTitle').textContent = '任務失敗';
+            document.getElementById('dialogText').textContent = '你的飛船被摧毀，任務失敗了。但你收集了 ' + gameState.foundClues + ' 個線索。';
+            
+            const dialogChoices = document.getElementById('dialogChoices');
+            dialogChoices.innerHTML = '';
+            
+            const restartChoice = document.createElement('div');
+            restartChoice.className = 'dialog-choice';
+            restartChoice.textContent = '重新開始遊戲';
+            restartChoice.addEventListener('click', restartGame);
+            dialogChoices.appendChild(restartChoice);
+            
+            dialogBox.style.display = 'block';
+            
+            // 停止音樂
+            audioManager.stopAllMusic();
+        }
+
+        // 顯示遊戲勝利
+        function showGameWin() {
+            const dialogBox = document.getElementById('dialogBox');
+            document.getElementById('dialogTitle').textContent = '任務成功！';
+            document.getElementById('dialogText').textContent = '恭喜！你成功找到了返回地球的路！你收集了 ' + gameState.foundClues + ' 個線索，訪問了 ' + gameState.visitedMaps.length + ' 個不同地點。';
+            
+            const dialogChoices = document.getElementById('dialogChoices');
+            dialogChoices.innerHTML = '';
+            
+            const restartChoice = document.createElement('div');
+            restartChoice.className = 'dialog-choice';
+            restartChoice.textContent = '重新開始遊戲';
+            restartChoice.addEventListener('click', restartGame);
+            dialogChoices.appendChild(restartChoice);
+            
+            dialogBox.style.display = 'block';
+            
+            // 播放勝利音樂
+            audioManager.playSound('victory');
+        }
+
+        // 重新開始遊戲
+        function restartGame() {
+            // 重置遊戲狀態
+            gameState.player = {
+                x: 100,
+                y: 300,
+                width: 40,
+                height: 60,
+                speed: 3,
+                dashSpeed: 9,
+                jumpForce: 12,
+                velocityY: 0,
+                isJumping: false,
+                health: 100,
+                maxHealth: 100,
+                fuel: 60,
+                maxFuel: 100,
+                energy: 80,
+                maxEnergy: 100,
+                credits: 50,
+                level: 1,
+                experience: 0,
+                experienceToNextLevel: 100,
+                inventory: ['應急口糧 x3', '醫療包 x1', '能量電池 x2'],
+                equippedWeapon: '雷射手槍',
+                equippedArmor: '基礎太空服',
+                abilities: {
+                    dash: { 
+                        cooldown: 2000, 
+                        lastUsed: 0, 
+                        active: false, 
+                        duration: 300 
+                    }
+                }
+            };
+            
+            gameState.currentMap = 'asteroidField';
+            gameState.enemies = [];
+            gameState.npcs = [];
+            gameState.platforms = [];
+            gameState.items = [];
+            gameState.inBattle = false;
+            gameState.currentEnemy = null;
+            gameState.gameOver = false;
+            gameState.gameWin = false;
+            gameState.foundClues = 0;
+            gameState.visitedMaps = [];
+            
+            // 關閉所有UI
+            document.getElementById('dialogBox').style.display = 'none';
+            document.getElementById('battleUI').style.display = 'none';
+            document.getElementById('inventoryPanel').style.display = 'none';
+            
+            // 重新載入地圖
+            loadMap(gameState.currentMap);
+            updateUI();
+            
+            // 播放背景音樂
+            if (gameState.musicEnabled) {
+                audioManager.playBackgroundMusic();
+            }
+            
+            showNotification('新遊戲開始！');
+        }
+
+        // 保存遊戲
+        function saveGame() {
+            const saveData = {
+                player: gameState.player,
+                currentMap: gameState.currentMap,
+                foundClues: gameState.foundClues,
+                visitedMaps: gameState.visitedMaps,
+                musicEnabled: gameState.musicEnabled,
+                soundEnabled: gameState.soundEnabled,
+                musicVolume: gameState.musicVolume,
+                soundVolume: gameState.soundVolume,
+                timestamp: Date.now()
+            };
+            
+            try {
+                localStorage.setItem('spaceExplorer_save', JSON.stringify(saveData));
+                console.log('遊戲已保存');
+            } catch (e) {
+                console.warn('無法保存遊戲:', e);
+            }
+        }
+
+        // 載入遊戲
+        function loadGame() {
+            try {
+                const saveData = JSON.parse(localStorage.getItem('spaceExplorer_save'));
+                if (saveData) {
+                    Object.assign(gameState.player, saveData.player);
+                    gameState.currentMap = saveData.currentMap || 'asteroidField';
+                    gameState.foundClues = saveData.foundClues || 0;
+                    gameState.visitedMaps = saveData.visitedMaps || [];
+                    gameState.musicEnabled = saveData.musicEnabled !== undefined ? saveData.musicEnabled : true;
+                    gameState.soundEnabled = saveData.soundEnabled !== undefined ? saveData.soundEnabled : true;
+                    gameState.musicVolume = saveData.musicVolume || 0.5;
+                    gameState.soundVolume = saveData.soundVolume || 0.7;
+                    
+                    // 更新音樂按鈕狀態
+                    document.getElementById('musicToggleBtn').classList.toggle('muted', !gameState.musicEnabled);
+                    document.getElementById('soundToggleBtn').classList.toggle('muted', !gameState.soundEnabled);
+                    
+                    // 更新音效系統
+                    audioManager.setMusicVolume(gameState.musicVolume);
+                    audioManager.setSoundVolume(gameState.soundVolume);
+                    
+                    loadMap(gameState.currentMap);
+                    updateUI();
+                    
+                    showNotification('遊戲已載入');
+                    return true;
+                }
+            } catch (e) {
+                console.warn('無法載入遊戲:', e);
+            }
+            return false;
+        }
+
+        // 繪製平台
+        function drawPlatforms() {
+            ctx.fillStyle = '#3a4b8a';
+            
+            for (const platform of gameState.platforms) {
+                if (isVisible(platform)) {
+                    ctx.fillRect(
+                        platform.x - camera.x, 
+                        platform.y - camera.y, 
+                        platform.width, 
+                        platform.height
+                    );
+                    
+                    // 平台頂部高光
+                    ctx.fillStyle = '#4a5bc7';
+                    ctx.fillRect(
+                        platform.x - camera.x, 
+                        platform.y - camera.y, 
+                        platform.width, 
+                        5
+                    );
+                    ctx.fillStyle = '#3a4b8a';
+                }
+            }
+        }
+
+        // 繪製玩家
+        function drawPlayer() {
+            const player = gameState.player;
+            
+            // 繪製玩家身體
+            ctx.fillStyle = '#4fc3f7';
+            ctx.fillRect(
+                player.x - camera.x, 
+                player.y - camera.y, 
+                player.width, 
+                player.height
+            );
+            
+            // 繪製玩家頭部
+            ctx.fillStyle = '#b3e5fc';
+            ctx.beginPath();
+            ctx.arc(
+                player.x - camera.x + player.width/2, 
+                player.y - camera.y + 15, 
+                12, 0, Math.PI * 2
+            );
+            ctx.fill();
+            
+            // 繪製生命條
+            const barWidth = 50;
+            const barHeight = 5;
+            const barX = player.x - camera.x + player.width/2 - barWidth/2;
+            const barY = player.y - camera.y - 10;
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+            
+            ctx.fillStyle = '#4caf50';
+            ctx.fillRect(barX, barY, barWidth * (player.health / player.maxHealth), barHeight);
+        }
+
+        // 繪製敵人
+        function drawEnemies() {
+            for (const enemy of gameState.enemies) {
+                const enemyType = enemyTypes[enemy.type];
+                
+                if (isVisible({ x: enemy.x, y: enemy.y, width: enemyType.width, height: enemyType.height })) {
+                    // 繪製敵人身體
+                    ctx.fillStyle = enemyType.color;
+                    ctx.fillRect(
+                        enemy.x - camera.x, 
+                        enemy.y - camera.y, 
+                        enemyType.width, 
+                        enemyType.height
+                    );
+                    
+                    // 繪製敵人生命條
+                    const barWidth = 40;
+                    const barHeight = 4;
+                    const barX = enemy.x - camera.x + enemyType.width/2 - barWidth/2;
+                    const barY = enemy.y - camera.y - 8;
+                    
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillRect(barX, barY, barWidth, barHeight);
+                    
+                    ctx.fillStyle = '#ff5252';
+                    ctx.fillRect(barX, barY, barWidth * (enemy.health / 50), barHeight);
+                }
+            }
+        }
+
+        // 繪製NPC
+        function drawNPCs() {
+            ctx.fillStyle = '#8bc34a';
+            
+            for (const npc of gameState.npcs) {
+                if (isVisible({ x: npc.x, y: npc.y, width: 40, height: 60 })) {
+                    // 繪製NPC身體
+                    ctx.fillRect(
+                        npc.x - camera.x, 
+                        npc.y - camera.y, 
+                        40, 
+                        60
+                    );
+                    
+                    // 繪製NPC頭部
+                    ctx.fillStyle = '#aed581';
+                    ctx.beginPath();
+                    ctx.arc(
+                        npc.x - camera.x + 20, 
+                        npc.y - camera.y + 15, 
+                        12, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                    ctx.fillStyle = '#8bc34a';
+                    
+                    // 繪製對話標誌
+                    ctx.fillStyle = '#ffeb3b';
+                    ctx.beginPath();
+                    ctx.arc(
+                        npc.x - camera.x + 35, 
+                        npc.y - camera.y + 10, 
+                        8, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#000';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.fillText('?', npc.x - camera.x + 32, npc.y - camera.y + 14);
+                }
+            }
+        }
+
+        // 繪製物品
+        function drawItems() {
+            for (const item of gameState.items) {
+                if (isVisible({ x: item.x, y: item.y, width: 30, height: 30 })) {
+                    // 根據物品類型繪製不同顏色
+                    let color = '#ff9800';
+                    if (item.type === 'medkit') color = '#f44336';
+                    if (item.type === 'starMap') color = '#9c27b0';
+                    if (item.type === 'energyCore') color = '#2196f3';
+                    if (item.type === 'weaponUpgrade') color = '#ff5722';
+                    if (item.type === 'navigationModule') color = '#00bcd4';
+                    if (item.type === 'finalKey') color = '#ffeb3b';
+                    
+                    // 物品漂浮動畫
+                    const floatOffset = Math.sin(Date.now() * 0.003) * 5;
+                    
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(
+                        item.x - camera.x + 15, 
+                        item.y - camera.y + 15 + floatOffset, 
+                        15, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                    
+                    // 物品發光效果
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // 繪製出口
+        function drawExit() {
+            const map = maps[gameState.currentMap];
+            if (!map.exit) return;
+            
+            const exit = map.exit;
+            if (isVisible(exit)) {
+                // 繪製出口
+                ctx.fillStyle = '#69f0ae';
+                ctx.fillRect(
+                    exit.x - camera.x, 
+                    exit.y - camera.y, 
+                    exit.width, 
+                    exit.height
+                );
+                
+                // 繪製出口標誌
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 16px Arial';
+                ctx.fillText('→', exit.x - camera.x + 18, exit.y - camera.y + 35);
+            }
+        }
+
+        // 檢查是否可見
+        function isVisible(rect) {
+            return rect.x < camera.x + canvas.width && 
+                   rect.x + rect.width > camera.x && 
+                   rect.y < camera.y + canvas.height && 
+                   rect.y + rect.height > camera.y;
+        }
+
+        // 創建粒子效果（簡化版）
+        function createParticles(x, y, count, color) {
+            // 由於性能考慮，這裡簡化了粒子系統
+            ctx.fillStyle = color;
+            for (let i = 0; i < count; i++) {
+                const size = Math.random() * 3 + 1;
+                const offsetX = (Math.random() - 0.5) * 20;
+                const offsetY = (Math.random() - 0.5) * 20;
+                
+                ctx.beginPath();
+                ctx.arc(x - camera.x + offsetX, y - camera.y + offsetY, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // 初始化遊戲
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
